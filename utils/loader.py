@@ -168,14 +168,20 @@ class TestDataset(Dataset):
 
 class CsvLoader(Dataset):
     """Load dataset with information from CSV file"""
-    def __init__(self, csv_path):
+    def __init__(self, csv_path, transform=None):
         """
         Args:
             csv_path: (string) path to the CSV file that contains the paths to the images
         """
+        self.transform = transform
         full_path = Path(csv_path)
         self.root_path = full_path.parent
         self.info_df = pd.read_csv(full_path)
+        self.cache_clean = np.empty([len(self.info_df), 64, 64, 3], dtype=np.uint8)
+        self.cache_noisy = np.empty([len(self.info_df), 64, 64, 3], dtype=np.uint8)
+        self.cache_iso = np.empty([len(self.info_df)], dtype=np.int)
+        self.cache_class = [''] * len(self.info_df)
+        self.is_cached = np.zeros([len(self.info_df)], dtype=np.uint8)
 
     def __len__(self):
         return len(self.info_df)
@@ -183,18 +189,36 @@ class CsvLoader(Dataset):
     def __getitem__(self, idx):
         if idx > len(self.info_df):
             raise IndexError
-        noisy_location = self.root_path / self.info_df.iloc[idx]['noisy_path']
-        clean_location = self.root_path / self.info_df.iloc[idx]['clean_path']
-        clean_image = Image.open(clean_location)
-        noisy_image = Image.open(noisy_location)
-        return {
-            'clean': transforms.functional.to_tensor(clean_image),
-            'noisy': transforms.functional.to_tensor(noisy_image),
-            'iso': torch.tensor(self.info_df.iloc[idx]['iso'], dtype=torch.float32),
-            'class': torch.LongTensor(self.info_df.iloc[idx]['class'].replace(CLASS_CODES))
-        }
+        if self.is_cached[idx] == 1:
+            sample = {
+                'clean': self.cache_clean[idx],
+                'noisy': self.cache_noisy[idx],
+                'iso': self.cache_iso[idx],
+                'class': self.cache_class[idx],
+            }
+        else:
+            noisy_location = self.root_path / self.info_df.iloc[idx]['noisy_path']
+            clean_location = self.root_path / self.info_df.iloc[idx]['clean_path']
+            clean_image = Image.open(clean_location)
+            noisy_image = Image.open(noisy_location)
+            self.cache_clean[idx] = np.array(clean_image)
+            self.cache_noisy[idx] = np.array(noisy_image)
+            self.cache_iso[idx] = self.info_df.iloc[idx]['iso']
+            # self.cache_class[idx] = self.info_df.iloc[idx]['class']
+            self.cache_class[idx] = 'building'
+            self.is_cached[idx] = 1
+            sample = {
+                'clean': clean_image,
+                'noisy': noisy_image,
+                'iso': self.info_df.iloc[idx]['iso'],
+                'class': 'building',
+            }
+        if self.transform is not None:
+            sample = self.transform(sample)
 
-    def random_split(self, test_ratio=0.5, seed=None):
+        return sample
+
+    def random_split(self, test_ratio=0.5, seed=None, data_subset=1.0):
         if seed is not None:
             np.random.seed(seed)
         n_total = self.__len__()

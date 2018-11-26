@@ -12,7 +12,7 @@ from tensorboardX import SummaryWriter
 from optimisation.testing import test
 from optimisation.training import train, validate, evaluate_psnr_and_vgg_loss
 from optimisation import loss
-from utils import TransformedHuaweiDataset, transform_sample
+from utils import TransformedHuaweiDataset, transform_sample, CsvLoader
 import models
 
 
@@ -140,7 +140,8 @@ def main(args):
     criterion = criterion_constructor(args) if args.args_to_loss else criterion_constructor()
     criterion = criterion.cuda() if args.cuda else criterion
 
-    dataset = TransformedHuaweiDataset(root_dir=args.data_dir, transform=transform_sample)
+    # dataset = TransformedHuaweiDataset(root_dir=args.data_dir, transform=transform_sample)
+    dataset = CsvLoader(args.data_dir, transform=transform_sample)
     train_dataset, val_dataset = dataset.random_split(test_ratio=args.test_split,
                                                       data_subset=args.data_subset)
 
