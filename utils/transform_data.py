@@ -62,7 +62,7 @@ def main(args: argparse.Namespace) -> None:
         dataset_info_writer(noisy_path, clean_path, sample['iso'], sample['class'],
                             patch_no+args.random_patches)
 
-    data.info_df.to_csv(str(transformed_path / "Training_Data.csv"), index=False)
+    data.info_df.to_csv(str(transformed_path / "Training_Info.csv"), index=False)
 
 
 def _get_dataset_info_writer(transformed_path):
